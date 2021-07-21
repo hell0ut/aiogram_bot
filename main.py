@@ -539,6 +539,8 @@ async def process_update_db(message: types.Message):
 
 async def favourites(message: types.Message,state):
     async with state.proxy() as data:
+        if 'favourites' not in data:
+            data['favourites'] = []
         if len(data['favourites'])>0:
             await message.reply('Ваши любимые картины')
             await States.FAVOURITES.set()
