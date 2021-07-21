@@ -621,15 +621,23 @@ async def on_shutdown(dp):
     pass
 
 
-engine = create_async_engine(f'sqlite+aiosqlite:///{DB_FILENAME}')
-with engine.begin() as conn:
-    conn.run_sync(Base.metadata.create_all)
-async_session = sessionmaker(
-    engine, expire_on_commit=False, class_=AsyncSession
-)
-bot['db']=async_session
+async def main():
+    engine = create_async_engine(f'sqlite+aiosqlite:///{DB_FILENAME}')
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+    async_session = sessionmaker(
+        engine, expire_on_commit=False, class_=AsyncSession
+    )
+    bot['db']=async_session
 
-start_webhook(dispatcher=dp, webhook_path=WEBHOOK_PATH,
-              on_startup=on_startup, on_shutdown=on_shutdown,
-              host=WEBAPP_HOST, port=WEBAPP_PORT)
+    start_webhook(dispatcher=dp, webhook_path=WEBHOOK_PATH,
+                  on_startup=on_startup, on_shutdown=on_shutdown,
+                  host=WEBAPP_HOST, port=WEBAPP_PORT)
+    try:
+        await dp.start_polling()
+    finally:
+        await dp.storage.close()
+        await dp.storage.wait_closed()
+        await bot.session.close()
 
+asyncio.run(main())
