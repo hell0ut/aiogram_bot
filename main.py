@@ -5,7 +5,6 @@ from aiogram.contrib.fsm_storage.memory import MemoryStorage
 from aiogram.types.message import ContentType
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import sessionmaker
-import asyncio
 from sqlalchemy.future import select
 import pandas as pd
 from datetime import datetime
@@ -17,8 +16,11 @@ from aiogram.types import ReplyKeyboardRemove, \
     ReplyKeyboardMarkup, KeyboardButton, \
     InlineKeyboardMarkup, InlineKeyboardButton
 
+from telegram_bot_pagination import InlineKeyboardPaginator
+
 from aiogram.dispatcher.filters.state import State, StatesGroup
 from aiogram.utils.executor import start_webhook
+import asyncio
 
 
 class States(StatesGroup):
@@ -132,7 +134,7 @@ class Picture(Base):
         back_populates='pictures')
 
 
-TOKEN = '1868938472:AAF3r1nERQeb4LK9IB5BiZ6VinLUZ9xXF-c'
+TOKEN = '1676178671:AAGMcKgoSVO_N5P44-X__U5TuWLFrjlukOU'
 public_key = 'sandbox_i63619417970'
 private_key = 'sandbox_wW5EUlWQAGxjR1u0exfjeqbgRgxn4LOigEediUy7'
 BUY_TOKEN = '632593626:TEST:sandbox_i63619417970'
@@ -178,12 +180,16 @@ async def handle_back_button(query, state: FSMContext):
     elif str(cur_state) == States.CHOOSE_STYLE.state:
         await States.START_STATE.set()
         await process_start_command(query.message)
+    elif str(cur_state) == States.CUR_PICTURE_CONFIRMATION.state:
+        await States.LIST_OF_PICTURES.set()
+        await send_character_page(query.message)
 
 
 # CATEGORY CHOOSE HANDLER
 @dp.callback_query_handler(lambda query: query.data.startswith('cat'), state='*')
 async def process_callback_styles(query, state: FSMContext):
     await bot.answer_callback_query(query.id)
+    await bot.delete_message(query.message.chat.id,query.message.message_id)
     async with state.proxy() as data:
         data['category'] = query.data
     if 'cur_help_id' not in data:
@@ -201,10 +207,12 @@ async def process_callback_styles(query, state: FSMContext):
 
 # SHADE CHOOSE HANDLER
 @dp.callback_query_handler(lambda query: query.data.startswith('sha'), state='*')
-async def process_callback_shades(query, state: FSMContext):
+async def process_callback_shades(query :types.CallbackQuery, state: FSMContext):
     await bot.answer_callback_query(query.id)
+    await bot.delete_message(query.message.chat.id,query.message.message_id)
     async with state.proxy() as data:
         db_session = bot.get("db")
+        data['pictures_pagelist'] = []
         async with db_session() as session:
             pictures_list = await session.execute(select(Picture)
                                                   .filter(Picture.shades.any(id=int(query.data[3:])),
@@ -214,44 +222,50 @@ async def process_callback_shades(query, state: FSMContext):
             try:
                 row = next(pictures_list)
                 picture = row['Picture']
+                data['pictures_pagelist'].append(picture)
                 buy_pic = InlineKeyboardMarkup() \
                     .insert(InlineKeyboardButton('Купить💎', callback_data='buy' + str(picture.id))) \
                     .insert(InlineKeyboardButton('В избранное♥', callback_data='fav' + str(picture.id)))
-                await bot.send_photo(query['from'].id,
-                                     picture.ph_url,
-                                     caption=f'{picture.name}\n'
-                                             f'Цена:{picture.price}\n'
-                                             f'Автор:{picture.author}\n'
-                                             f'Размер:{picture.size}',
-                                     reply_markup=buy_pic)
+                # await bot.send_photo(query['from'].id,
+                #                      picture.ph_url,
+                #                      caption=f'{picture.name}\n'
+                #                              f'Цена:{picture.price}\n'
+                #                              f'Автор:{picture.author}\n'
+                #                              f'Размер:{picture.size}',
+                #                      reply_markup=buy_pic)
                 for row in pictures_list:
                     picture = row['Picture']
+                    data['pictures_pagelist'].append(picture)
                     buy_pic = InlineKeyboardMarkup() \
                         .insert(InlineKeyboardButton('Купить💎', callback_data='buy' + str(picture.id))) \
                         .insert(InlineKeyboardButton('В избранное♥', callback_data='fav' + str(picture.id)))
-                    await bot.send_photo(query['from'].id,
-                                         picture.ph_url,
-                                         caption=f'{picture.name}'
-                                                 f'Цена:{picture.price}\n'
-                                                 f'Автор:{picture.author}\n'
-                                                 f'Размер:{picture.size}',
-                                         reply_markup=buy_pic)
+                    # await bot.send_photo(query['from'].id,
+                    #                      picture.ph_url,
+                    #                      caption=f'{picture.name}'
+                    #                              f'Цена:{picture.price}\n'
+                    #                              f'Автор:{picture.author}\n'
+                    #                              f'Размер:{picture.size}',
+                    #                      reply_markup=buy_pic)
             except StopIteration:
                 pictures_list = await session.execute(select(Picture))
                 for row in pictures_list:
                     picture = row['Picture']
+                    data['picture_pagelist'].append(picture)
                     buy_pic = InlineKeyboardMarkup() \
                         .insert(InlineKeyboardButton('Купить💎', callback_data='buy' + str(picture.id))) \
                         .insert(InlineKeyboardButton('В избранное♥', callback_data='fav' + str(picture.id)))
-                    await bot.send_photo(query['from'].id,
-                                         picture.ph_url,
-                                         caption=f'{picture.name}'
-                                                 f'Цена:{picture.price}\n'
-                                                 f'Автор:{picture.author}\n'
-                                                 f'Размер:{picture.size}',
-                                         reply_markup=buy_pic)
-        if 'cur_help_id' not in data:
-            await States.LIST_OF_PICTURES.set()
+                    # await bot.send_photo(query['from'].id,
+                    #                      picture.ph_url,
+                    #                      caption=f'{picture.name}'
+                    #                              f'Цена:{picture.price}\n'
+                    #                              f'Автор:{picture.author}\n'
+                    #                              f'Размер:{picture.size}',
+                    #                      reply_markup=buy_pic)
+            await send_character_page(query.message,data)
+
+#        if 'cur_help_id' not in data:
+#            await States.LIST_OF_PICTURES.set()
+#            print(data['pictures_pagelist'])
 
 
 # SEND INVOICE
@@ -314,7 +328,7 @@ async def process_successful_payment(message: types.Message, state: FSMContext):
 async def manager_send_picture(user_id, pic_id, price, photo_id, picture_name, author, size):
     await bot.send_message(user_id, 'Мы подобрали вам подходящую картину')
     await bot.send_photo(chat_id=user_id, photo=photo_id, caption=f'Вы подтверждаете картину {picture_name} ?'
-                                                                  f'Цена: {price}', reply_markup=confirm_markup)
+                                                                  f'Цена: {price}', reply_markup=confirm_markup.add(go_back_but))
     state = dp.current_state(chat=user_id, user=user_id)
     async with state.proxy() as data:
         data['pic_id'] = pic_id
@@ -600,7 +614,59 @@ async def on_shutdown(dp):
     await dp.storage.close()
     await dp.storage.wait_closed()
     await bot.session.close()
-    pass
+
+
+@dp.callback_query_handler(lambda query: query.data.split('#')[0] == 'character',state='*')
+async def characters_page_callback(call,state: FSMContext):
+    await bot.answer_callback_query(call.id)
+    async with state.proxy() as data:
+        page = int(call.data.split('#')[1])
+        await bot.delete_message(
+            call.message.chat.id,
+            call.message.message_id
+        )
+        await bot.delete_message(
+            call.message.chat.id,
+            call.message.message_id-1
+        )
+        await send_character_page(call.message, data,page)
+
+
+async def send_character_page(message, data,page=1,):
+    user_id = int(message.chat.id)
+    paginator = InlineKeyboardPaginator(
+        len(data['pictures_pagelist'])//2,
+        current_page=page,
+        data_pattern='character#{page}'
+    )
+    pic_ind=(page-1)*2
+    cur_pics=data['pictures_pagelist'][pic_ind:pic_ind+2]
+    for cur_pic in cur_pics:
+        buy_pic = InlineKeyboardMarkup().\
+            insert(InlineKeyboardButton('Купить💎', callback_data='buy' + str(cur_pic.id))).\
+            insert(InlineKeyboardButton('В избранное♥', callback_data='fav' + str(cur_pic.id)))
+
+        if cur_pic!=cur_pics[-1]:
+            await bot.send_photo(user_id,
+                                 cur_pic.ph_url,
+                                 caption=f'{cur_pic.name}\n'
+                                         f'Цена:{cur_pic.price}\n'
+                                         f'Автор:{cur_pic.author}\n'
+                                         f'Размер:{cur_pic.size}',
+                                 reply_markup=buy_pic)
+        else:
+            paginator.add_before(
+                InlineKeyboardButton('Купить💎', callback_data='buy' + str(cur_pic.id)),
+                InlineKeyboardButton('В избранное♥', callback_data='fav' + str(cur_pic.id))
+            )
+            await bot.send_photo(user_id,
+                                 cur_pic.ph_url,
+                                 caption=f'{cur_pic.name}\n'
+                                         f'Цена:{cur_pic.price}\n'
+                                         f'Автор:{cur_pic.author}\n'
+                                         f'Размер:{cur_pic.size}',
+                                 reply_markup=paginator.markup)
+
 
 
 engine1 = create_engine(f'sqlite:///{DB_FILENAME}')
@@ -613,6 +679,16 @@ async_session = sessionmaker(
     )
 bot['db'] = async_session
 
+
+# async def main():
+#     await dp.start_polling()
+# 
+# asyncio.run(main())
 start_webhook(dispatcher=dp, webhook_path=WEBHOOK_PATH,
               on_startup=on_startup, on_shutdown=on_shutdown,
               host=WEBAPP_HOST, port=WEBAPP_PORT)
+
+
+
+
+
