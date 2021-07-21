@@ -622,7 +622,7 @@ async def on_shutdown(dp):
 
 
 engine = create_async_engine(f'sqlite+aiosqlite:///{DB_FILENAME}')
-async with engine.begin() as conn:
+with engine.begin() as conn:
     await conn.run_sync(Base.metadata.create_all)
 async_session = sessionmaker(
     engine, expire_on_commit=False, class_=AsyncSession
