@@ -617,12 +617,7 @@ async def main():
         engine, expire_on_commit=False, class_=AsyncSession
     )
     bot['db']=async_session
-    try:
-        await dp.start_polling()
-    finally:
-        await dp.storage.close()
-        await dp.storage.wait_closed()
-        await bot.session.close()
+
 
         
 async def on_startup(dp):
@@ -630,11 +625,13 @@ async def on_startup(dp):
     
     
 async def on_shutdown(dp):
-    # insert code here to run it before shutdown
+    await dp.storage.close()
+    await dp.storage.wait_closed()
+    await bot.session.close()
     pass
 
-
+asyncio.run(main())
 start_webhook(dispatcher=dp, webhook_path=WEBHOOK_PATH,
               on_startup=on_startup, on_shutdown=on_shutdown,
               host=WEBAPP_HOST, port=WEBAPP_PORT)
-asyncio.run(main())
+
