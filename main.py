@@ -609,17 +609,7 @@ async def change_state(message: types.Message,state : FSMContext):
         await message.reply(unknown_command)
 
 
-async def main():
-    engine = create_async_engine(f'sqlite+aiosqlite:///{DB_FILENAME}')
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
-    async_session = sessionmaker(
-        engine, expire_on_commit=False, class_=AsyncSession
-    )
-    bot['db']=async_session
-
-
-        
+      
 async def on_startup(dp):
     await bot.set_webhook(WEBHOOK_URL)
     
@@ -630,7 +620,15 @@ async def on_shutdown(dp):
     await bot.session.close()
     pass
 
-asyncio.run(main())
+
+engine = create_async_engine(f'sqlite+aiosqlite:///{DB_FILENAME}')
+async with engine.begin() as conn:
+    await conn.run_sync(Base.metadata.create_all)
+async_session = sessionmaker(
+    engine, expire_on_commit=False, class_=AsyncSession
+)
+bot['db']=async_session
+
 start_webhook(dispatcher=dp, webhook_path=WEBHOOK_PATH,
               on_startup=on_startup, on_shutdown=on_shutdown,
               host=WEBAPP_HOST, port=WEBAPP_PORT)
