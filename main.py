@@ -630,8 +630,10 @@ async def main():
     )
     bot['db']=async_session
 
-asyncio.run(main())
+try:
+    asyncio.run(main())
+except:
+    start_webhook(dispatcher=dp, webhook_path=WEBHOOK_PATH,
+                  on_startup=on_startup, on_shutdown=on_shutdown,
+                  host=WEBAPP_HOST, port=WEBAPP_PORT)
 
-start_webhook(dispatcher=dp, webhook_path=WEBHOOK_PATH,
-              on_startup=on_startup, on_shutdown=on_shutdown,
-              host=WEBAPP_HOST, port=WEBAPP_PORT)
