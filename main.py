@@ -630,14 +630,8 @@ async def main():
     )
     bot['db']=async_session
 
-    await start_webhook(dispatcher=dp, webhook_path=WEBHOOK_PATH,
-                  on_startup=on_startup, on_shutdown=on_shutdown,
-                  host=WEBAPP_HOST, port=WEBAPP_PORT)
-    try:
-        await dp.start_polling()
-    finally:
-        await dp.storage.close()
-        await dp.storage.wait_closed()
-        await bot.session.close()
-
 asyncio.run(main())
+
+start_webhook(dispatcher=dp, webhook_path=WEBHOOK_PATH,
+              on_startup=on_startup, on_shutdown=on_shutdown,
+              host=WEBAPP_HOST, port=WEBAPP_PORT)
