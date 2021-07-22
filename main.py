@@ -15,7 +15,7 @@ from sqlalchemy.ext.declarative import declarative_base
 from aiogram.types import ReplyKeyboardRemove, \
     ReplyKeyboardMarkup, KeyboardButton, \
     InlineKeyboardMarkup, InlineKeyboardButton
-
+from  sqlalchemy.sql.expression import func
 from telegram_bot_pagination import InlineKeyboardPaginator
 
 from aiogram.dispatcher.filters.state import State, StatesGroup
@@ -224,19 +224,16 @@ async def process_callback_shades(query :types.CallbackQuery, state: FSMContext)
                                                   .filter(Picture.shades.any(id=int(query.data[3:])),
                                                           Picture.styles.any(id=int(data['category'][3:]))))
             await bot.send_message(query['from'].id, 'Вот ваши подобранные картины:')
-
-            try:
-                row = next(pictures_list)
+            i=0
+            for row in pictures_list:
+                i+=1
                 picture = row['Picture']
                 data['pictures_pagelist'].append(picture)
+            if i==0:
+                pictures_list = await session.execute(select(Picture).order_by(func.random()).limit(20))
                 for row in pictures_list:
                     picture = row['Picture']
                     data['pictures_pagelist'].append(picture)
-            except StopIteration:
-                pictures_list = await session.execute(select(Picture))
-                for row in pictures_list:
-                    picture = row['Picture']
-                    data['picture_pagelist'].append(picture)
             await send_character_page(query.message,data)
 
             # if 'cur_help_id' not in data:
@@ -677,7 +674,7 @@ async def send_character_page(message, data,page=1):
             insert(InlineKeyboardButton('Купить 💎', callback_data='buy' + str(cur_pic.id))).\
             insert(InlineKeyboardButton('В избранное ♥', callback_data='fav' + str(cur_pic.id)))
 
-        if cur_pic!=cur_pics[-1]:
+        if cur_pic != cur_pics[-1] or len(data['pictures_pagelist'])<3:
             await bot.send_photo(user_id,
                                  cur_pic.ph_url,
                                  caption=f'{cur_pic.name}\n'
@@ -687,8 +684,8 @@ async def send_character_page(message, data,page=1):
                                  reply_markup=buy_pic)
         else:
             paginator.add_before(
-                InlineKeyboardButton('Купить💎', callback_data='buy' + str(cur_pic.id)),
-                InlineKeyboardButton('В избранное♥', callback_data='fav' + str(cur_pic.id))
+                InlineKeyboardButton('Купить 💎', callback_data='buy' + str(cur_pic.id)),
+                InlineKeyboardButton('В избранное ♥', callback_data='fav' + str(cur_pic.id))
             )
             await bot.send_photo(user_id,
                                  cur_pic.ph_url,
@@ -713,8 +710,12 @@ bot['db'] = async_session
 
 # async def main():
 #     await dp.start_polling()
-# 
+#
 # asyncio.run(main())
 start_webhook(dispatcher=dp, webhook_path=WEBHOOK_PATH,
               on_startup=on_startup, on_shutdown=on_shutdown,
               host=WEBAPP_HOST, port=WEBAPP_PORT)
+
+
+
+
