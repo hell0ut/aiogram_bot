@@ -135,7 +135,7 @@ class Picture(Base):
 
 
 CUR_DIV = 4500
-TOKEN = '1868938472:AAF3r1nERQeb4LK9IB5BiZ6VinLUZ9xXF-c'
+TOKEN = '1676178671:AAGMcKgoSVO_N5P44-X__U5TuWLFrjlukOU'
 public_key = 'sandbox_i63619417970'
 private_key = 'sandbox_wW5EUlWQAGxjR1u0exfjeqbgRgxn4LOigEediUy7'
 BUY_TOKEN = '632593626:TEST:sandbox_i63619417970'
@@ -489,7 +489,7 @@ async def process_start_command(message: types.Message, state: FSMContext):
 
 
 # help message
-@dp.message_handler(commands=['help'])
+@dp.message_handler(commands=['help'],state='*')
 async def process_help_command(message: types.Message):
     await message.reply(help_message, reply_markup=global_markup)
 
@@ -658,7 +658,6 @@ async def characters_page_callback(call,state: FSMContext):
         await send_character_page(call.message, data,page)
 
 
-
 async def send_character_page(message, data,page=1):
     user_id = int(message.chat.id)
     data['page'] = page
@@ -708,10 +707,10 @@ async_session = sessionmaker(
 bot['db'] = async_session
 
 
-# async def main():
-#     await dp.start_polling()
-#
-# asyncio.run(main())
+#async def main():
+#    await dp.start_polling()
+
+#asyncio.run(main())
 start_webhook(dispatcher=dp, webhook_path=WEBHOOK_PATH,
               on_startup=on_startup, on_shutdown=on_shutdown,
               host=WEBAPP_HOST, port=WEBAPP_PORT)
