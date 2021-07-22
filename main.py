@@ -135,7 +135,7 @@ class Picture(Base):
 
 
 CUR_DIV = 4500
-TOKEN = '1676178671:AAGMcKgoSVO_N5P44-X__U5TuWLFrjlukOU'
+TOKEN = '1868938472:AAF3r1nERQeb4LK9IB5BiZ6VinLUZ9xXF-c'
 public_key = 'sandbox_i63619417970'
 private_key = 'sandbox_wW5EUlWQAGxjR1u0exfjeqbgRgxn4LOigEediUy7'
 BUY_TOKEN = '632593626:TEST:sandbox_i63619417970'
