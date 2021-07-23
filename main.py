@@ -613,13 +613,6 @@ async def help_with_pic(message: types.Message,state : FSMContext):
                 ' Отправьте нам несколько фото интерьера')
 
 
-@dp.message_handler(state=States.HELP_WITH_PIC_NAME)
-async def handle_name(message: types.Message, state: FSMContext):
-    async with state.proxy() as data:
-        data['name'] = message.text
-        await message.reply(f'Ваше имя: {message.text}')
-    await help_with_pic(message, state)
-
 
 
 @dp.message_handler(content_types=['photo'], state=States.HELP_WITH_PICTURE)
@@ -670,6 +663,13 @@ async def change_state(message: types.Message, state: FSMContext):
     else:
         await message.reply(unknown_command)
 
+
+@dp.message_handler(state=States.HELP_WITH_PIC_NAME)
+async def handle_name(message: types.Message, state: FSMContext):
+    async with state.proxy() as data:
+        data['name'] = message.text
+        await message.reply(f'Ваше имя: {message.text}')
+    await help_with_pic(message, state)
 
 async def on_startup(dp):
     await bot.set_webhook(WEBHOOK_URL)
@@ -748,7 +748,7 @@ bot['db'] = async_session
 
 # async def main():
 #     await dp.start_polling()
-# 
+#
 # asyncio.run(main())
 start_webhook(dispatcher=dp, webhook_path=WEBHOOK_PATH,
               on_startup=on_startup, on_shutdown=on_shutdown,
