@@ -4,11 +4,14 @@ from aiogram.dispatcher import Dispatcher, FSMContext
 from aiogram.contrib.fsm_storage.memory import MemoryStorage
 from aiogram.types.message import ContentType
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy.orm import Session,sessionmaker
 from sqlalchemy.future import select
 import pandas as pd
 from datetime import datetime
 import os
+import ssl
+from aiogram.utils import executor
+
 from sqlalchemy import Column, Integer, String, Table, ForeignKey,create_engine
 from sqlalchemy.orm import relationship
 from sqlalchemy.ext.declarative import declarative_base
@@ -22,12 +25,12 @@ from aiogram.dispatcher.filters.state import State, StatesGroup
 from aiogram.utils.executor import start_webhook
 import asyncio
 
-
 class States(StatesGroup):
     START_STATE = State()
     HELP_WITH_PICTURE = State()
     HELP_WITH_PIC_NAME = State()
     HELP_WITH_PIC_NUM = State()
+    HELP_ORD_NAME = State()
     BUY_PICTURE = State()
     CHOOSE_STYLE = State()
     CHOOSE_SHADES = State()
@@ -37,6 +40,8 @@ class States(StatesGroup):
     ASK_FOR_CONTACT = State()
     MANAGER_MODE = State()
     FAVOURITES = State()
+    PAY_WITH_CASH = State()
+    PAY_WITH_CRYPT = State()
 
 
 favourites_button = KeyboardButton('Избранное ♥')
@@ -58,6 +63,16 @@ markup_request = ReplyKeyboardMarkup(resize_keyboard=True).add(
 confirm_but = InlineKeyboardButton('Подтверждаю✔️', callback_data='confirmthis')
 
 confirm_markup = InlineKeyboardMarkup().add(confirm_but)
+
+give_choice_markup =InlineKeyboardMarkup() \
+                    .insert(InlineKeyboardButton('Картой', callback_data='card')) \
+                    .insert(InlineKeyboardButton('Криптой', callback_data='crypt')) \
+                    .add(InlineKeyboardButton('Наличными (полная предоплата)', callback_data='cash'))
+
+crypt_choice = InlineKeyboardMarkup()\
+    .insert(InlineKeyboardButton('BTC', callback_data='btc')) \
+    .insert(InlineKeyboardButton('ETH', callback_data='eth')) \
+    .add(InlineKeyboardButton('USDT', callback_data='usdt'))
 
 start_message = 'Привет! Я - Искусство, как и ты, Человек. Только бот. ' \
                 'Здесь ты можешь выбрать картину на свой вкус или мои кореша-дизайнеры' \
@@ -122,10 +137,13 @@ class Picture(Base):
     __tablename__ = 'picture'
     id = Column(Integer, primary_key=True)
     name = Column(String(63))
-    ph_url = Column(String(255))
+    ph_url = Column(String(767))
     size = Column(String(127))
     author = Column(String(127))
     price = Column(Integer)
+    year = Column(Integer)
+    mats = Column(String(63))
+    art_styles = Column(String(127))
     shades = relationship(
         'Shade',
         secondary=shade_pic_table,
@@ -145,8 +163,15 @@ MY_ID = 344548620
 DB_FILENAME = 'pictures.db'
 secret_password = 'IAMART'
 DB_URL = 'https://docs.google.com/spreadsheets/d/1a6In5Xc2eSA9PNt_ncHr6a8zbe8_33wIh8jOVje-NX4/gviz/tq?tqx=out:csv&sheet=Database'
-MANAGER_IDS = {'1586995361',
+MANAGER_IDS = {1586995361,
                }
+
+
+
+host='database-1.c8pemjym32rz.us-east-2.rds.amazonaws.com'
+db_name='postgres'
+user='postgres'
+password='Y3dWgd3AmJ08MEKTnpnX'
 
 columns = {'name': 'Название картины',
            'styles': 'Стиль/Стили',
@@ -154,7 +179,11 @@ columns = {'name': 'Название картины',
            'price': 'Цена',
            'size': 'Размер',
            'url': 'URL фотографии',
-           'author': 'Автор'
+           'author': 'Автор',
+           'mats': 'Материал/краски',
+           'year': 'Написана в',
+           'art_st': 'Стиль'
+
            }
 
 storage = MemoryStorage()
@@ -200,14 +229,12 @@ async def process_callback_styles(query, state: FSMContext):
         data['category'] = query.data
     if 'cur_help_id' not in data:
         await States.CHOOSE_SHADES.set()
-    db_session = bot.get("db")
-    async with db_session() as session:
-        shades = await session.execute(select(Shade))
-        shades_inline = InlineKeyboardMarkup()
-        for row in shades:
-            item = row['Shade']
-            shade = InlineKeyboardButton(item.name, callback_data='sha' + str(item.id))
-            shades_inline.insert(shade)
+    #session = bot.get("db")
+    shades = session.query(Shade)
+    shades_inline = InlineKeyboardMarkup()
+    for item in shades:
+        shade = InlineKeyboardButton(item.name, callback_data='sha' + str(item.id))
+        shades_inline.insert(shade)
     await bot.send_message(query['from'].id, "Выберите оттенок", reply_markup=shades_inline)
 
 
@@ -219,24 +246,21 @@ async def process_callback_shades(query :types.CallbackQuery, state: FSMContext)
     async with state.proxy() as data:
         if 'favourites' not in data:
             data['favourites'] = []
-        db_session = bot.get("db")
+        #session = bot.get("db")
         data['pictures_pagelist'] = []
-        async with db_session() as session:
-            pictures_list = await session.execute(select(Picture)
-                                                  .filter(Picture.shades.any(id=int(query.data[3:])),
-                                                          Picture.styles.any(id=int(data['category'][3:]))))
-            await bot.send_message(query['from'].id, 'Вот ваши подобранные картины:')
-            i=0
+        pictures_list = session.query(Picture).filter(Picture.shades.any(id=int(query.data[3:])),
+                                                      Picture.styles.any(id=int(data['category'][3:])))
+        await bot.send_message(query['from'].id, 'Вот ваши подобранные картины:')
+        i=0
+        for picture in pictures_list:
+            i+=1
+            data['pictures_pagelist'].append(picture)
+        if i==0:
+            pictures_list = session.query(Picture).order_by(func.random()).limit(20)
             for row in pictures_list:
-                i+=1
                 picture = row['Picture']
                 data['pictures_pagelist'].append(picture)
-            if i==0:
-                pictures_list = await session.execute(select(Picture).order_by(func.random()).limit(20))
-                for row in pictures_list:
-                    picture = row['Picture']
-                    data['pictures_pagelist'].append(picture)
-            await send_character_page(query.message,data)
+        await send_character_page(query.message,data)
 
             # if 'cur_help_id' not in data:
             #     await States.LIST_OF_PICTURES.set()
@@ -300,10 +324,9 @@ async def process_successful_payment(message: types.Message, state: FSMContext):
         else:
             await bot.send_message(message.chat.id, 'Оплата прошла успешно. Скоро мы с вами свяжемся!')
             order = message.successful_payment.order_info
-            db_session = bot.get('db')
-            async with db_session() as session:
-                await session.execute(text(f'DELETE FROM picture WHERE id = {data["pic_id"][3:]};'))
-                await session.commit()
+            #session = bot.get('db')
+            session.query(Picture).filter(Picture.id==["pic_id"][3:])
+            session.commit()
             for manager_id in MANAGER_IDS:
                 await bot.send_message(manager_id, f'Прошла успешно оплата по картине {data["picture_name"]}\n'
                                                    f'Цена: {data["price"]} €\n'
@@ -323,7 +346,8 @@ async def process_successful_payment(message: types.Message, state: FSMContext):
 async def manager_send_picture(user_id, pic_id, price, photo_id, picture_name, author, size):
     await bot.send_message(user_id, 'Мы подобрали вам подходящую картину')
     await bot.send_photo(chat_id=user_id, photo=photo_id, caption=f'Вы подтверждаете картину {picture_name} ?'
-                                                                  f'Цена: {price} €', reply_markup=confirm_markup.add(go_back_but))
+                                                                  f'Цена: {price} €\n',
+                         reply_markup=confirm_markup.add(go_back_but))
     state = dp.current_state(chat=user_id, user=user_id)
     async with state.proxy() as data:
         data['pic_id'] = pic_id
@@ -340,11 +364,8 @@ async def process_callback_picture(query, state: FSMContext):
     await bot.answer_callback_query(query.id)
     async with state.proxy() as data:
         data['pic_id'] = query.data
-        db_session = bot.get("db")
-        async with db_session() as session:
-            picture_list = await session.execute(select(Picture).filter(Picture.id == int(query.data[3:])))
-            for picture_row in picture_list:
-                picture = picture_row['Picture']
+        #session = bot.get("db")
+        picture = session.query(Picture).filter(Picture.id==int(query.data[3:])).first()
         if 'cur_help_id' in data:
             await manager_send_picture(data['cur_help_id'], picture.id, picture.price, picture.ph_url, picture.name,picture.author,picture.size)
         else:
@@ -419,16 +440,16 @@ async def process_callback_add_to_fav(query:types.CallbackQuery, state: FSMConte
 async def process_callback_confirm(query, state: FSMContext):
     await bot.answer_callback_query(query.id)
     async with state.proxy() as data:
-        if 'number' in data:
-            await send_confirmation_to_manager(user_id=data['user_id'],
-                                               picture_name=data['picture_name'],
-                                               photo_id=data['photo_id'],name=data['name'],number=data['number'])
-            answer = f'{manager_pending}'
-            await bot.send_message(query['from'].id, answer)
-        else:
-
+        if 'number' not in data:
             await bot.send_message(query['from'].id, "Нам нужен Ваш номер для связи", reply_markup=markup_request)
             await States.ASK_FOR_CONTACT.set()
+        else:
+            await send_confirmation_to_manager(user_id=data['user_id'],
+                                               picture_name=data['picture_name'],
+                                               photo_id=data['photo_id'], name=data['name'], number=data['number'])
+            answer = f'{manager_pending}'
+            await bot.send_message(query['from'].id, answer)
+
 
 
 # CONTACT MANAGEMENT
@@ -467,8 +488,77 @@ async def managerconfirm(query):
     for manager_id in MANAGER_IDS:
         await bot.send_message(manager_id, f"Заказ на картину {picture} от {user_id} принят")
     await bot.send_message(user_id, "Ваш заказ подтвержден")
-    await send_invoice(user_id)
+    await give_choice_payment(user_id)
+    #await send_invoice(user_id)
 
+
+async def give_choice_payment(user_id):
+    await bot.send_message(user_id,'Выберите способ оплаты:',reply_markup=give_choice_markup)
+
+
+@dp.callback_query_handler(lambda query: query.data=='card', state='*')
+async def card_handler(query:types.CallbackQuery):
+    await bot.answer_callback_query(query.id)
+    await send_invoice(query.from_user.id)
+
+
+@dp.callback_query_handler(lambda query: query.data=='cash', state='*')
+async def cash_handler(query:types.CallbackQuery):
+    await bot.answer_callback_query(query.id)
+    await States.PAY_WITH_CASH.set()
+    await bot.send_message(query.message.chat.id,'Введите место и время (дату), когда Вам удобно передать оплату нашему курьеру')
+
+
+@dp.callback_query_handler(lambda query: query.data == 'crypt', state='*')
+async def crypt_handler(query: types.CallbackQuery):
+    await bot.answer_callback_query(query.id)
+    await States.PAY_WITH_CRYPT.set()
+    await bot.send_message(query.message.chat.id, 'Выберите криптовалюту:', reply_markup=crypt_choice)
+
+
+
+BTC_T='19R1RSRDehitUUHZPA2n8uH4b3tjBmfLDN'
+ETH_T='0xa7DE14Be588642a48b2191a56D4b6eBb4f0FD003'
+USDT_T='0xa7DE14Be588642a48b2191a56D4b6eBb4f0FD003'
+crypt_message = 'После оплаты мы свяжемся с вами'
+
+@dp.callback_query_handler(lambda query: query.data == 'btc', state='*')
+async def crypt_handler_btc(query: types.CallbackQuery):
+    await bot.answer_callback_query(query.id)
+    await bot.send_message(query.message.chat.id, f'BTC Кошелек: {BTC_T}\n{crypt_message}')
+
+
+@dp.callback_query_handler(lambda query: query.data == 'eth', state='*')
+async def crypt_handler_eth(query: types.CallbackQuery):
+    await bot.answer_callback_query(query.id)
+    await bot.send_message(query.message.chat.id, f'ETH Кошелек: {ETH_T}\n{crypt_message}')
+
+
+@dp.callback_query_handler(lambda query: query.data == 'usdt', state='*')
+async def crypt_handler_usdt(query: types.CallbackQuery):
+    await bot.answer_callback_query(query.id)
+    await bot.send_message(query.message.chat.id, f'USDT Кошелек:{USDT_T}\n{crypt_message}')
+
+
+@dp.message_handler(state=States.PAY_WITH_CASH)
+async def cash_answer_handler(message: types.Message):
+    await bot.send_message(message.chat.id,f'Спасибо!\n'
+                                           f'Вы выбрали: {message.text}\n'
+                                           f'Мы свяжемся с Вами для подтверждения/уточнения деталей:)')
+    await manager_send_cash_info(message.chat.id,message.text)
+
+
+async def manager_send_cash_info(user_id,adress_info):
+    state = dp.current_state(user=user_id,chat=user_id)
+    async with state.proxy() as data:
+        answer =f'Прошла успешно оплата по картине {data["picture_name"]}\n' \
+                f'Цена: {data["price"]} €\n'\
+                f'{data["photo_id"]}.\n'\
+                f'Номер получателя:{data["number"]}\n'\
+                f'Имя получателя (тг):{data["name"]}\n' \
+                f'Информация про адрес и время:{adress_info}'
+        for manager_id in MANAGER_IDS:
+            await bot.send_message(manager_id,answer)
 
 # manager confirm
 @dp.callback_query_handler(lambda query: query.data.startswith('m_disc'), state='*')
@@ -502,7 +592,7 @@ async def process_help_command(message: types.Message):
 @dp.message_handler(commands=['leave_manager'], state=States.MANAGER_MODE)
 async def process_leave_manager(message: types.Message):
     await States.START_STATE.set()
-    MANAGER_IDS.remove(int(message.from_user.id))
+    MANAGER_IDS.remove(message.from_user.id)
     await message.reply('Вы в стандартном режиме', reply_markup=global_markup)
 
 
@@ -512,7 +602,7 @@ async def process_go_manager(message: types.Message):
     args = message.get_args()
     if args == secret_password:
         await States.MANAGER_MODE.set()
-        MANAGER_IDS.add(int(message.from_user.id))
+        MANAGER_IDS.add(message.from_user.id)
         await message.reply('Выставлен режим менеджера', reply_markup=global_markup)
     else:
         await message.reply('У вас нет доступа к этой комманде', reply_markup=global_markup)
@@ -523,38 +613,45 @@ async def process_go_manager(message: types.Message):
 async def process_update_db(message: types.Message):
     args = message.get_args()
     if args == secret_password:
-        db_session = bot.get('db')
-        async with db_session() as session:
-            await session.execute(text('DELETE FROM picture;'))
-            await session.execute(text('DELETE FROM shade;'))
-            await session.execute(text('DELETE FROM style;'))
-            await session.execute(text('DELETE FROM shade_pic_table;'))
-            await session.execute(text('DELETE FROM style_pic_table;'))
-            await session.commit()
-            df = pd.read_csv(DB_URL)
-            for index, row in df.iterrows():
-                shades = row[columns['shade']].replace(" ", "").split(',')
-                styles = row[columns['styles']].replace(" ", "").split(',')
-                picture = Picture(name=row[columns['name']],
-                                  price=row[columns['price']],
-                                  ph_url=row[columns['url']],
-                                  size=row[columns['size']],
-                                  author=row[columns['author']])
-                for shade in shades:
-                    try:
-                        obj = next(await session.execute(select(Shade).filter(Shade.name == shade)))['Shade']
-                        picture.shades.append(obj)
-                    except:
-                        picture.shades.append(Shade(name=shade))
-                for style in styles:
-                    try:
-                        obj = next(await session.execute(select(Style).filter(Style.name == style)))['Style']
-                        picture.styles.append(obj)
-                    except:
-                        picture.styles.append(Style(name=style))
-                session.add(picture)
-                await session.commit()
-            await message.reply('База успешно обновлена', reply_markup=global_markup)
+        #session = bot.get('db')
+        # session.execute(text('DELETE FROM shade_pic_table;'))
+        # session.execute(text('DELETE FROM style_pic_table;'))
+        # session.execute(text('DELETE FROM picture;'))
+        # session.execute(text('DELETE FROM shade;'))
+        # session.execute(text('DELETE FROM style;'))
+        # session.commit()
+        df = pd.read_csv(DB_URL)
+        for index, row in df.iterrows():
+            cur_pic =session.query(Picture).filter(name=row[columns['name']]).first()
+            if cur_pic is not None:
+                continue
+            shades = row[columns['shade']].replace(" ", "").split(',')
+            styles = row[columns['styles']].replace(" ", "").split(',')
+            picture = Picture(name=row[columns['name']],
+                              price=row[columns['price']],
+                              ph_url=row[columns['url']],
+                              size=row[columns['size']],
+                              author=row[columns['author']],
+                              art_styles=row[columns['art_st']],
+                              mats=row[columns['mats']],
+                              year=row[columns['year']]
+                              )
+
+            for shade in shades:
+                cur_shs = session.query(Shade).filter(name=shade).first()
+                if cur_shs is not None:
+                    picture.shades.append(cur_shs)
+                else:
+                    picture.shades.append(Shade(name=shade))
+            for style in styles:
+                cur_st = session.query(Style).filter(name=style).first()
+                if cur_st is not None:
+                    picture.styles.append(cur_st)
+                else:
+                    picture.styles.append(Style(name=style))
+            session.add(picture)
+            session.commit()
+        await message.reply('База успешно обновлена', reply_markup=global_markup)
     else:
         await message.reply('У вас нет доступа к этой комманде', reply_markup=global_markup)
 
@@ -566,33 +663,29 @@ async def favourites(message: types.Message, state):
         if len(data['favourites']) > 0:
             await message.reply('Ваши любимые картины')
             await States.FAVOURITES.set()
-            db_session = bot.get('db')
-            async with db_session() as session:
-                for picture_id in data['favourites']:
-                    fav_pic = InlineKeyboardMarkup() \
-                        .insert(InlineKeyboardButton('Купить 💎', callback_data='buy' + str(picture_id))) \
-                        .insert(InlineKeyboardButton('Удалить из избранного ♥', callback_data='del' + picture_id))
-                    picture = next(await session.execute(select(Picture).filter(Picture.id == int(picture_id))))[
-                        'Picture']
+            #session = bot.get('db')
+            for picture_id in data['favourites']:
+                fav_pic = InlineKeyboardMarkup() \
+                    .insert(InlineKeyboardButton('Купить 💎', callback_data='buy' + str(picture_id))) \
+                    .insert(InlineKeyboardButton('Удалить из избранного ♥', callback_data='del' + picture_id))
+                picture = session.execute(Picture).filter(Picture.id==int(picture_id))
 
-                    await bot.send_photo(message.chat.id,
-                                         picture.ph_url,
-                                         caption=f'Ваша картина {picture.name}\n'
-                                                 f'Цена : {picture.price} €',
-                                         reply_markup=fav_pic)
+                await bot.send_photo(message.chat.id,
+                                     picture.ph_url,
+                                     caption=f'Ваша картина {picture.name}\n'
+                                             f'Цена : {picture.price} €',
+                                     reply_markup=fav_pic)
         else:
             await message.reply('У вас нет ничего :(. Перейдите в магазин, чтобы добавить картины в избранное:)')
 
 
 async def shop(message: types.Message):
-    db_session = bot.get("db")
-    async with db_session() as session:
-        styles = await session.execute(select(Style))
-        styles_inline = InlineKeyboardMarkup()
-        for row in styles:
-            item = row['Style']
-            style = InlineKeyboardButton(item.name, callback_data='cat' + str(item.id))
-            styles_inline.insert(style)
+    #session = bot.get("db")
+    styles = session.query(Style)
+    styles_inline = InlineKeyboardMarkup()
+    for style in styles:
+        style = InlineKeyboardButton(style.name, callback_data='cat' + str(style.id))
+        styles_inline.insert(style)
     await message.reply('Выберите один из нескольких стилей для вашей картины', reply_markup=styles_inline)
 
 
@@ -620,7 +713,6 @@ async def handle_docs_photo(message: types.Message):
     await message.reply('Спасибо. Скоро мы отправим вам несколько вариантов.')
     suppose_keyboard = InlineKeyboardMarkup().insert(
         InlineKeyboardButton('подобрать', callback_data=f'sup,{message.from_user.id}'))
-    print(MANAGER_IDS)
     for manager_id in MANAGER_IDS:
         await message.forward(manager_id)
         await bot.send_message(manager_id, f'Подобрать картину пользователю {message.from_user.username}',
@@ -649,6 +741,22 @@ async def suppose_photo(query, state: FSMContext):
     await shop(query.message)
 
 
+@dp.message_handler(state=States.HELP_WITH_PIC_NAME)
+async def handle_name(message: types.Message, state: FSMContext):
+    async with state.proxy() as data:
+        data['name'] = message.text
+        await message.reply(f'Ваше имя: {message.text}')
+    await help_with_pic(message, state)
+
+
+@dp.message_handler(state=States.HELP_ORD_NAME)
+async def handle_name(message: types.Message, state: FSMContext):
+    async with state.proxy() as data:
+        data['name'] = message.text
+        await message.reply(f'Ваше имя: {message.text}')
+    await help_with_pic(message, state)
+
+
 @dp.message_handler(state='*')
 async def change_state(message: types.Message, state: FSMContext):
     if message.text == favourites_button.text:
@@ -664,12 +772,6 @@ async def change_state(message: types.Message, state: FSMContext):
         await message.reply(unknown_command)
 
 
-@dp.message_handler(state=States.HELP_WITH_PIC_NAME)
-async def handle_name(message: types.Message, state: FSMContext):
-    async with state.proxy() as data:
-        data['name'] = message.text
-        await message.reply(f'Ваше имя: {message.text}')
-    await help_with_pic(message, state)
 
 async def on_startup(dp):
     await bot.set_webhook(WEBHOOK_URL)
@@ -679,6 +781,7 @@ async def on_shutdown(dp):
     await dp.storage.close()
     await dp.storage.wait_closed()
     await bot.session.close()
+    session.close()
 
 
 @dp.callback_query_handler(lambda query: query.data.split('#')[0] == 'character',state='*')
@@ -718,7 +821,10 @@ async def send_character_page(message, data,page=1):
                                  caption=f'{cur_pic.name}\n'
                                          f'Цена: {cur_pic.price} €\n'
                                          f'Автор: {cur_pic.author}\n'
-                                         f'Размер: {cur_pic.size}',
+                                         f'Размер: {cur_pic.size}\n'
+                                         f'Год написания: {cur_pic.year}\n'
+                                         f'Материал/краски: {cur_pic.mats}\n'
+                                         f'Стиль: {cur_pic.art_styles}',
                                  reply_markup=buy_pic)
         else:
             paginator.add_before(
@@ -730,26 +836,30 @@ async def send_character_page(message, data,page=1):
                                  caption=f'{cur_pic.name}\n'
                                          f'Цена: {cur_pic.price} €\n'
                                          f'Автор: {cur_pic.author}\n'
-                                         f'Размер: {cur_pic.size}',
+                                         f'Размер: {cur_pic.size}'
+                                         f'Год написания: {cur_pic.year}\n'
+                                         f'Материал/краски: {cur_pic.mats}\n'
+                                         f'Стиль: {cur_pic.art_styles}',
                                  reply_markup=paginator.markup)
 
 
 
-engine1 = create_engine(f'sqlite:///{DB_FILENAME}')
-Base.metadata.create_all(engine1)
-engine = create_async_engine(f'sqlite+aiosqlite:///{DB_FILENAME}')
-#   async with engine.begin() as conn:
-#      await conn.run_sync(Base.metadata.create_all)
-async_session = sessionmaker(
-        engine, expire_on_commit=False, class_=AsyncSession
-    )
-bot['db'] = async_session
+#Base.metadata.create_all(engine1)
+ssl_context = ssl.SSLContext()
+engine = create_engine(f'postgresql+pg8000://{user}:{password}@{host}/{db_name}',connect_args={'ssl_context': ssl_context},
+                       # echo=True
+                       )
+#for tbl in reversed(Base.metadata.sorted_tables):
+#    engine.execute(tbl.delete())
+
+DBSession = sessionmaker(bind=engine)
+session = DBSession()
+#Base.metadata.create_all(engine)
+#session.commit()
+#bot['db'] = session
+#executor.start_polling(dp,on_shutdown=session.close())
 
 
-# async def main():
-#     await dp.start_polling()
-#
-# asyncio.run(main())
 start_webhook(dispatcher=dp, webhook_path=WEBHOOK_PATH,
               on_startup=on_startup, on_shutdown=on_shutdown,
               host=WEBAPP_HOST, port=WEBAPP_PORT)
