@@ -514,6 +514,7 @@ async def crypt_handler(query: types.CallbackQuery):
     await bot.answer_callback_query(query.id)
     await States.PAY_WITH_CRYPT.set()
     await bot.send_message(query.message.chat.id, 'Выберите криптовалюту:', reply_markup=crypt_choice)
+    await manager_send_cash_info(query.message.chat.id,'Оплата криптовалютой')
 
 
 
@@ -545,6 +546,7 @@ async def cash_answer_handler(message: types.Message):
     await bot.send_message(message.chat.id,f'Спасибо!\n'
                                            f'Вы выбрали: {message.text}\n'
                                            f'Мы свяжемся с Вами для подтверждения/уточнения деталей:)')
+    await States.START_STATE.set()
     await manager_send_cash_info(message.chat.id,message.text)
 
 
