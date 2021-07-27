@@ -670,7 +670,7 @@ async def favourites(message: types.Message, state):
                 fav_pic = InlineKeyboardMarkup() \
                     .insert(InlineKeyboardButton('Купить 💎', callback_data='buy' + str(picture_id))) \
                     .insert(InlineKeyboardButton('Удалить из избранного ♥', callback_data='del' + picture_id))
-                picture = session.execute(Picture).filter(Picture.id==int(picture_id))
+                picture = session.query(Picture).filter(Picture.id==int(picture_id)).first()
 
                 await bot.send_photo(message.chat.id,
                                      picture.ph_url,
