@@ -646,7 +646,7 @@ async def process_update_db(message: types.Message):
         df = pd.read_csv(DB_URL)
         current_pics_query = session.query(Picture)
         for index, row in df.iterrows():
-            cur_pic = current_pics_query.filter(name=row[columns['name']]).first()
+            cur_pic = current_pics_query.filter(Picture.name==row[columns['name']]).first()
             if cur_pic is not None:
                 continue
             shades = row[columns['shade']].replace(" ", "").split(',')
@@ -662,13 +662,13 @@ async def process_update_db(message: types.Message):
                               )
 
             for shade in shades:
-                cur_shs = session.query(Shade).filter(name=shade).first()
+                cur_shs = session.query(Shade).filter(Shade.name==shade).first()
                 if cur_shs is not None:
                     picture.shades.append(cur_shs)
                 else:
                     picture.shades.append(Shade(name=shade))
             for style in styles:
-                cur_st = session.query(Style).filter(name=style).first()
+                cur_st = session.query(Style).filter(Style.name==style).first()
                 if cur_st is not None:
                     picture.styles.append(cur_st)
                 else:
