@@ -109,13 +109,13 @@ unknown_command = 'Я вас не понимаю :(. Нажмите, пожал�
 Base = declarative_base()
 
 style_pic_table = Table('style_pic_table', Base.metadata,
-                        Column('style_id', Integer, ForeignKey('style.id')),
-                        Column('picture_id', Integer, ForeignKey('picture.id'))
+                        Column('style_id', Integer, ForeignKey('style.id', ondelete="CASCADE")),
+                        Column('picture_id', Integer, ForeignKey('picture.id', ondelete="CASCADE"))
                         )
 
 shade_pic_table = Table('shade_pic_table', Base.metadata,
-                        Column('shade_id', Integer, ForeignKey('shade.id')),
-                        Column('picture_id', Integer, ForeignKey('picture.id'))
+                        Column('shade_id', Integer, ForeignKey('shade.id',ondelete='CASCADE')),
+                        Column('picture_id', Integer, ForeignKey('picture.id', ondelete="CASCADE"))
                         )
 
 
@@ -154,13 +154,11 @@ class Picture(Base):
     shades = relationship(
         'Shade',
         secondary=shade_pic_table,
-        back_populates='pictures',
-        cascade='delete')
+        back_populates='pictures')
     styles = relationship(
         'Style',
         secondary=style_pic_table,
-        back_populates='pictures',
-        cascade='delete')
+        back_populates='pictures')
 
 
 CUR_DIV = 4500
@@ -335,7 +333,7 @@ async def process_successful_payment(message: types.Message, state: FSMContext):
             order = message.successful_payment.order_info
             #session = bot.get('db')
             session.query(Picture).filter(Picture.id==["pic_id"][3:])
-            session.commit()
+            #session.commit()
             for manager_id in MANAGER_IDS:
                 await bot.send_message(manager_id, f'Прошла успешно оплата по картине {data["picture_name"]}\n'
                                                    f'Цена: {data["price"]} €\n'
@@ -647,34 +645,34 @@ async def process_update_db(message: types.Message):
         current_pics_query = session.query(Picture)
         for index, row in df.iterrows():
             cur_pic = current_pics_query.filter(Picture.name==row[columns['name']]).first()
-            if cur_pic is not None:
-                continue
+            if cur_pic is None:
+                cur_pic = Picture(name=row[columns['name']],
+                                  price=row[columns['price']],
+                                  ph_url=row[columns['url']],
+                                  size=row[columns['size']],
+                                  author=row[columns['author']],
+                                  art_styles=row[columns['art_st']],
+                                  mats=row[columns['mats']],
+                                  year=row[columns['year']]
+                                  )
             shades = row[columns['shade']].replace(" ", "").split(',')
             styles = row[columns['styles']].replace(" ", "").split(',')
-            picture = Picture(name=row[columns['name']],
-                              price=row[columns['price']],
-                              ph_url=row[columns['url']],
-                              size=row[columns['size']],
-                              author=row[columns['author']],
-                              art_styles=row[columns['art_st']],
-                              mats=row[columns['mats']],
-                              year=row[columns['year']]
-                              )
-
             for shade in shades:
                 cur_shs = session.query(Shade).filter(Shade.name==shade).first()
                 if cur_shs is not None:
-                    picture.shades.append(cur_shs)
+                    cur_pic.shades.append(cur_shs)
                 else:
-                    picture.shades.append(Shade(name=shade))
+                    cur_pic.shades.append(Shade(name=shade))
             for style in styles:
                 cur_st = session.query(Style).filter(Style.name==style).first()
                 if cur_st is not None:
-                    picture.styles.append(cur_st)
+                    cur_pic.styles.append(cur_st)
                 else:
-                    picture.styles.append(Style(name=style))
-            session.add(picture)
+                    cur_pic.styles.append(Style(name=style))
+            session.add(cur_pic)
+            break
         session.commit()
+
         await message.reply('База успешно обновлена', reply_markup=global_markup)
     else:
         await message.reply('У вас нет доступа к этой комманде', reply_markup=global_markup)
@@ -872,7 +870,7 @@ async def send_character_page(message, data,page=1):
 ssl_context = ssl.SSLContext()
 engine = create_engine(f'postgresql+pg8000://{user}:{password}@{host}/{db_name}',
                        connect_args={'ssl_context': ssl_context},
-                       #echo=True
+                       echo=True
                        )
 #for tbl in reversed(Base.metadata.sorted_tables):
 #    engine.execute(tbl.delete())
@@ -882,7 +880,7 @@ session = DBSession()
 #Base.metadata.create_all(engine)
 #session.commit()
 #bot['db'] = session
-#executor.start_polling(dp,on_shutdown=session.close())
+# executor.start_polling(dp,on_shutdown=session.close())
 
 
 start_webhook(dispatcher=dp, webhook_path=WEBHOOK_PATH,
