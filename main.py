@@ -868,7 +868,7 @@ async def send_character_page(message, data,page=1):
 ssl_context = ssl.SSLContext()
 engine = create_engine(f'postgresql+pg8000://{user}:{password}@{host}/{db_name}',
                        connect_args={'ssl_context': ssl_context},
-                       echo=True
+                       #echo=True
                        )
 #for tbl in reversed(Base.metadata.sorted_tables):
 #    engine.execute(tbl.delete())
