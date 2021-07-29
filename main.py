@@ -171,7 +171,7 @@ DB_FILENAME = 'pictures.db'
 secret_password = 'IAMART'
 DB_URL = 'https://docs.google.com/spreadsheets/d/1a6In5Xc2eSA9PNt_ncHr6a8zbe8_33wIh8jOVje-NX4/gviz/tq?tqx=out:csv&sheet=Database'
 MANAGER_IDS = {1586995361,
-               #1942245489,
+               1942245489,
                }
 
 
