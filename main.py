@@ -155,12 +155,12 @@ class Picture(Base):
         'Shade',
         secondary=shade_pic_table,
         back_populates='pictures',
-        cascade='all,delete')
+        cascade='delete')
     styles = relationship(
         'Style',
         secondary=style_pic_table,
         back_populates='pictures',
-        cascade='all,delete')
+        cascade='delete')
 
 
 CUR_DIV = 4500
