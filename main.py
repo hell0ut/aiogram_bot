@@ -171,7 +171,7 @@ DB_FILENAME = 'pictures.db'
 secret_password = 'IAMART'
 DB_URL = 'https://docs.google.com/spreadsheets/d/1a6In5Xc2eSA9PNt_ncHr6a8zbe8_33wIh8jOVje-NX4/gviz/tq?tqx=out:csv&sheet=Database'
 MANAGER_IDS = {1586995361,
-               1942245489,
+               #1942245489,
                }
 
 
@@ -264,8 +264,7 @@ async def process_callback_shades(query :types.CallbackQuery, state: FSMContext)
             data['pictures_pagelist'].append(picture)
         if i==0:
             pictures_list = session.query(Picture).order_by(func.random()).limit(20)
-            for row in pictures_list:
-                picture = row['Picture']
+            for picture in pictures_list:
                 data['pictures_pagelist'].append(picture)
         await send_character_page(query.message,data)
 
@@ -869,7 +868,7 @@ async def send_character_page(message, data,page=1):
 ssl_context = ssl.SSLContext()
 engine = create_engine(f'postgresql+pg8000://{user}:{password}@{host}/{db_name}',
                        connect_args={'ssl_context': ssl_context},
-                       #echo=True
+                       echo=True
                        )
 #for tbl in reversed(Base.metadata.sorted_tables):
 #    engine.execute(tbl.delete())
@@ -879,7 +878,7 @@ session = DBSession()
 #Base.metadata.create_all(engine)
 #session.commit()
 #bot['db'] = session
-# executor.start_polling(dp,on_shutdown=session.close())
+#executor.start_polling(dp,on_shutdown=session.close())
 
 
 start_webhook(dispatcher=dp, webhook_path=WEBHOOK_PATH,
