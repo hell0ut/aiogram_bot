@@ -98,13 +98,6 @@ class States(StatesGroup):
 
 go_back_but = InlineKeyboardButton('Назад🔙', callback_data='go back')
 
-markup_request = ReplyKeyboardMarkup(resize_keyboard=True).add(
-    KeyboardButton(_('Отправить свой контакт ☎️'), request_contact=True)
-)
-
-confirm_but = InlineKeyboardButton('Подтверждаю✔️', callback_data='confirmthis')
-
-confirm_markup = InlineKeyboardMarkup().add(confirm_but)
 
 give_choice_markup =InlineKeyboardMarkup() \
                     .insert(InlineKeyboardButton(_('Картой'), callback_data='card')) \
@@ -388,7 +381,6 @@ async def process_callback_picture(query, state: FSMContext):
         # if 'cur_help_id' in data:
         #     await manager_send_picture(data['cur_help_id'], picture.id, picture.price, picture.ph_url, picture.name,picture.author,picture.size)
         # else:
-        await bot.send_message(query['from'].id,_('Вы подтверждаете картину ?\n'))
         data['price'] = picture.price
         data['photo_id'] = picture.ph_url
         data['picture_name'] = picture.name
@@ -396,11 +388,14 @@ async def process_callback_picture(query, state: FSMContext):
         data['author'] = picture.author
         await bot.send_photo(query['from'].id,
                              picture.ph_url,
-                             caption=_('Ваша картина: ')+picture.name+'\n'+
-                                     _('Автор: ')+picture.author+'\n'+
-                                     _('Размер: ')+picture.size+'\n'+
-                                     _('Цена: ')+picture.price+'€\n',
-                             reply_markup=confirm_markup)
+                             caption=_('Ваша картина: {name}\n'
+                                     'Автор: {author}\n'
+                                     'Размер: {size}\n'
+                                     'Цена: {price}€\n').format(name=picture.name,
+                                                                author=picture.author,
+                                                                size=picture.size,
+                                                                price=picture.price),
+                             reply_markup=InlineKeyboardMarkup().add(InlineKeyboardButton(_('Подтверждаю✔️'), callback_data='confirmthis')))
         await States.CUR_PICTURE_CONFIRMATION.set()
 
 
@@ -460,7 +455,9 @@ async def process_callback_confirm(query, state: FSMContext):
     await bot.answer_callback_query(query.id)
     async with state.proxy() as data:
         if 'number' not in data:
-            await bot.send_message(query['from'].id, _("Нам нужен Ваш номер для связи"), reply_markup=markup_request)
+            await bot.send_message(query['from'].id, _("Нам нужен Ваш номер для связи"), reply_markup=ReplyKeyboardMarkup(resize_keyboard=True).add(
+    KeyboardButton(_('Отправить свой контакт ☎️'), request_contact=True)
+))
             await States.ASK_FOR_CONTACT.set()
         else:
             await send_confirmation_to_manager(user_id=data['user_id'],
@@ -474,8 +471,10 @@ async def process_callback_confirm(query, state: FSMContext):
 @dp.message_handler(content_types=['contact'], state=States.ASK_FOR_CONTACT)
 async def contact(message: types.Message, state: FSMContext):
     if message.contact is not None:
-        await bot.send_message(message.chat.id, 'Вы успешно отправили свой номер', ReplyKeyboardMarkup(resize_keyboard=True).insert(
-    KeyboardButton(_('Избранное ♥'))).insert(KeyboardButton(_('Подобрать картину 🏪'))))
+        await bot.send_message(message.chat.id, _('Вы успешно отправили свой номер'),reply_markup=
+                               ReplyKeyboardMarkup(resize_keyboard=True).
+                               insert(KeyboardButton(_('Избранное ♥'))).
+                               insert(KeyboardButton(_('Подобрать картину 🏪'))))
         async with state.proxy() as data:
             data['number'] = str(message.contact.phone_number)
             data['user_id'] = str(message.contact.user_id)
@@ -903,7 +902,7 @@ async def send_character_page(message, data,page=1):
 ssl_context = ssl.SSLContext()
 engine = create_engine(f'postgresql+pg8000://{user}:{password}@{host}/{db_name}',
                        connect_args={'ssl_context': ssl_context},
-                       echo=True
+                       #echo=True
                        )
 #for tbl in reversed(Base.metadata.sorted_tables):
 #    engine.execute(tbl.delete())
