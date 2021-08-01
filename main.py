@@ -7,7 +7,7 @@ import pandas as pd
 from datetime import datetime
 import os
 import ssl
-from aiogram.utils import executor
+# from aiogram.utils import executor
 from typing import Tuple, Any
 from sqlalchemy import Column, Integer, String, Table, ForeignKey,create_engine
 from sqlalchemy.orm import relationship
@@ -855,11 +855,11 @@ async def send_character_page(message, data,page=1):
     pic_ind=(page-1)*2
     cur_pics=data['pictures_pagelist'][pic_ind:pic_ind+2]
     for cur_pic in cur_pics:
-        buy_pic = InlineKeyboardMarkup().\
-            insert(InlineKeyboardButton(_('Купить 💎'), callback_data='buy' + str(cur_pic.id))).\
-            insert(InlineKeyboardButton(_('В избранное ♥'), callback_data='fav' + str(cur_pic.id)))
-
+        art_styles = ', '.join(map(_,cur_pic.art_styles.replace(" ", "").split(',')))
         if cur_pic != cur_pics[-1] or len(data['pictures_pagelist'])<3:
+            buy_pic = InlineKeyboardMarkup(). \
+                insert(InlineKeyboardButton(_('Купить 💎'), callback_data='buy' + str(cur_pic.id))). \
+                insert(InlineKeyboardButton(_('В избранное ♥'), callback_data='fav' + str(cur_pic.id)))
             await bot.send_photo(user_id,
                                  cur_pic.ph_url,
                                  caption=_('{name}\n'
@@ -872,8 +872,8 @@ async def send_character_page(message, data,page=1):
                                          price=cur_pic.price,
                                          author=cur_pic.author,
                                          size=cur_pic.size,
-                                         mats=cur_pic.mats,
-                                         art_styles=cur_pic.art_styles),
+                                         mats=_(cur_pic.mats),
+                                         art_styles=art_styles),
                                  reply_markup=buy_pic)
         else:
             paginator.add_before(
@@ -892,8 +892,8 @@ async def send_character_page(message, data,page=1):
                                          price=cur_pic.price,
                                          author=cur_pic.author,
                                          size=cur_pic.size,
-                                         mats=cur_pic.mats,
-                                         art_styles=cur_pic.art_styles),
+                                         mats=_(cur_pic.mats),
+                                         art_styles=art_styles),
                                  reply_markup=paginator.markup)
 
 
@@ -912,7 +912,7 @@ session = DBSession()
 #Base.metadata.create_all(engine)
 #session.commit()
 #bot['db'] = session
-#executor.start_polling(dp,on_shutdown=session.close())
+# executor.start_polling(dp,on_shutdown=session.close())
 
 
 start_webhook(dispatcher=dp, webhook_path=WEBHOOK_PATH,
