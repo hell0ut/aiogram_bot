@@ -289,3 +289,82 @@ msgstr "Abstract art"
 msgid "Натюрморт"
 msgstr "Still life"
 
+#: main.py:858
+msgid "Экспрессионизм"
+msgstr "Expressionism"
+
+#: main.py:858
+msgid "Импрессионизм"
+msgstr "Impressionism"
+
+#: main.py:858
+msgid "Абстракционизм"
+msgstr "Abstractionism"
+
+#: main.py:858
+msgid "Поп-арт"
+msgstr "Pop Art"
+
+
+#: main.py:858
+msgid "Концептуальный"
+msgstr "Conceptual"
+
+#: main.py:858
+msgid "Арт-деко"
+msgstr "Art Deco"
+
+#: main.py:858
+msgid "Сюрреализм"
+msgstr "Surrealism"
+
+
+#: main.py:858
+msgid "Реализм"
+msgstr "Realism"
+
+#: main.py:858
+msgid "Модерн"
+msgstr "Modern"
+
+
+#: main.py:875
+msgid "Масло на холсте"
+msgstr "Oil on canvas"
+
+#: main.py:875
+msgid "Акрил на холсте"
+msgstr "Acrylic on canvas"
+
+#: main.py:875
+msgid "Смешанная техника на холсте"
+msgstr "Mixed technique on canvas"
+
+#: main.py:875
+msgid "Графит, черныла на бумаге"
+msgstr "Graphite blackened on paper"
+
+#: main.py:875
+msgid "Пастель на картоне"
+msgstr "Pastel on cardboard"
+
+#: main.py:875
+msgid "Акварель на бумаге"
+msgstr "Watercolor on paper"
+
+
+#: main.py:875
+msgid "Карандаш на бумаге"
+msgstr "Pencil on paper"
+
+
+#: main.py:875
+msgid "Эмаль на холсте"
+msgstr "Enamel on canvas"
+
+#: main.py:875
+msgid "Акрил, Масло на холсте"
+msgstr "Acrylic, Oil on canvas"
+
+
+
