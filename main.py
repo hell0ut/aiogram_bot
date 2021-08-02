@@ -223,7 +223,7 @@ columns = {'name': 'Название картины',
 
 # CATEGORY CHOOSE HANDLERd
 @dp.callback_query_handler(lambda query: query.data.startswith('cat'), state='*')
-async def process_callback_styles(query:types.CallbackQuery, state: FSMContext, bot: Bot):
+async def process_callback_styles(query:types.CallbackQuery, state: FSMContext):
     await bot.answer_callback_query(query.id)
     await bot.delete_message(query.message.chat.id,query.message.message_id)
     async with state.proxy() as data:
