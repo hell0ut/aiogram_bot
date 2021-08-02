@@ -1,1 +1,1 @@
-web: python main.py
+web: python main.py & bot2.py & wait -n
