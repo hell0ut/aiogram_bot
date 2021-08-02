@@ -36,8 +36,8 @@ class ACLMiddleware(I18nMiddleware):
 
 
 CUR_DIV = 4500
-TOKEN = '1676178671:AAH4uDRNu0JEmXX7sOMESwiE57xBOM3maGE'
-TOKEN_TEST = '1868938472:AAFdhFMbJbrqDPcX-ytOCNhgT9Kmp2902Y0'
+TOKEN_TEST = '1676178671:AAH4uDRNu0JEmXX7sOMESwiE57xBOM3maGE'
+TOKEN = '1868938472:AAFdhFMbJbrqDPcX-ytOCNhgT9Kmp2902Y0'
 TOKEN2 = '1775418331:AAFfh3FDSYIByWsa_V48LQr723Jnkf-rMpQ'
 public_key = 'sandbox_i63619417970'
 private_key = 'sandbox_wW5EUlWQAGxjR1u0exfjeqbgRgxn4LOigEediUy7'
@@ -56,11 +56,9 @@ USDT_T='0xa7DE14Be588642a48b2191a56D4b6eBb4f0FD003'
 crypt_message = 'После оплаты мы свяжемся с вами'
 
 storage = MemoryStorage()
-storage2 = MemoryStorage()
 bot = Bot(token=TOKEN)
 dp = Dispatcher(bot, storage=storage)
-bot2 = Bot(token=TOKEN2)
-dp2 = Dispatcher(bot2, storage=storage2)
+
 
 i18n = ACLMiddleware(I18N_DOMAIN,LOCALES_DIR)
 dp.middleware.setup(i18n)
@@ -68,9 +66,8 @@ _ = i18n.gettext
 
 WEBHOOK_HOST = 'https://deploy-heroku-bot-aiogram-pics.herokuapp.com'  # name your app
 WEBHOOK_PATH = '/webhook/'
-WEBHOOK_PATH2 = '/webhook2/'
 WEBHOOK_URL = f"{WEBHOOK_HOST}{WEBHOOK_PATH}"
-WEBHOOK_URL2= f"{WEBHOOK_HOST}{WEBHOOK_PATH2}"
+
 
 WEBAPP_HOST = '0.0.0.0'
 WEBAPP_PORT = os.environ.get('PORT')
