@@ -1,29 +1,33 @@
-from aiogram import Bot, types
+from aiogram import Bot
 from aiogram.dispatcher import Dispatcher, FSMContext
 from aiogram.contrib.fsm_storage.memory import MemoryStorage
 from aiogram.types.message import ContentType
 from sqlalchemy.orm import sessionmaker
 import pandas as pd
 from datetime import datetime
-import os
 import ssl
-
-from typing import Tuple, Any
-from sqlalchemy import Column, Integer, String, Table, ForeignKey,create_engine
-from sqlalchemy.orm import relationship
-from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy import create_engine
 from aiogram.types import ReplyKeyboardMarkup, KeyboardButton, \
     InlineKeyboardMarkup, InlineKeyboardButton
 from  sqlalchemy.sql.expression import func
 from telegram_bot_pagination import InlineKeyboardPaginator
-
-from aiogram.dispatcher.filters.state import State, StatesGroup
 from aiogram.utils.executor import start_webhook
-
-import gspread
-from oauth2client.service_account import ServiceAccountCredentials
-from aiogram.contrib.middlewares.i18n import I18nMiddleware
 from pathlib import Path
+from aiogram.contrib.middlewares.i18n import I18nMiddleware
+from aiogram import Bot, types
+from typing import Tuple, Any
+
+
+from settings import *
+from states import States
+from models import *
+from interface.keyboards import *
+from interface.messages import *
+
+storage = MemoryStorage()
+bot = Bot(token=TOKEN)
+dp = Dispatcher(bot, storage=storage)
+
 I18N_DOMAIN='testbot'
 BASE_DIR = Path(__file__).parent
 LOCALES_DIR = BASE_DIR / 'locales'
@@ -35,190 +39,9 @@ class ACLMiddleware(I18nMiddleware):
         return str(user.locale)
 
 
-CUR_DIV = 4500
-TOKEN_TEST = '1676178671:AAH4uDRNu0JEmXX7sOMESwiE57xBOM3maGE'
-TOKEN = '1868938472:AAFdhFMbJbrqDPcX-ytOCNhgT9Kmp2902Y0'
-TOKEN2 = '1775418331:AAFfh3FDSYIByWsa_V48LQr723Jnkf-rMpQ'
-public_key = 'sandbox_i63619417970'
-private_key = 'sandbox_wW5EUlWQAGxjR1u0exfjeqbgRgxn4LOigEediUy7'
-BUY_TOKEN = '632593626:TEST:sandbox_i63619417970'
-MY_ID = 344548620
-DB_FILENAME = 'pictures.db'
-secret_password = 'IAMART'
-DB_URL = 'https://docs.google.com/spreadsheets/d/1a6In5Xc2eSA9PNt_ncHr6a8zbe8_33wIh8jOVje-NX4/gviz/tq?tqx=out:csv&sheet=Database'
-MANAGER_IDS = {1586995361,
-               1942245489,
-               }
-
-BTC_T='19R1RSRDehitUUHZPA2n8uH4b3tjBmfLDN'
-ETH_T='0xa7DE14Be588642a48b2191a56D4b6eBb4f0FD003'
-USDT_T='0xa7DE14Be588642a48b2191a56D4b6eBb4f0FD003'
-crypt_message = 'После оплаты мы свяжемся с вами'
-
-storage = MemoryStorage()
-bot = Bot(token=TOKEN)
-dp = Dispatcher(bot, storage=storage)
-
-
-i18n = ACLMiddleware(I18N_DOMAIN,LOCALES_DIR)
+i18n = ACLMiddleware(I18N_DOMAIN, LOCALES_DIR)
 dp.middleware.setup(i18n)
 _ = i18n.gettext
-
-WEBHOOK_HOST = 'https://deploy-heroku-bot-aiogram-pics.herokuapp.com'  # name your app
-WEBHOOK_PATH = '/webhook/'
-WEBHOOK_URL = f"{WEBHOOK_HOST}{WEBHOOK_PATH}"
-
-
-WEBAPP_HOST = '0.0.0.0'
-WEBAPP_PORT = os.environ.get('PORT')
-
-
-
-
-
-scope = ["https://spreadsheets.google.com/feeds",'https://www.googleapis.com/auth/spreadsheets',"https://www.googleapis.com/auth/drive.file","https://www.googleapis.com/auth/drive"]
-
-creds = ServiceAccountCredentials.from_json_keyfile_name("credentials.json", scope)
-client = gspread.authorize(creds)
-db_sheet = client.open_by_key("1a6In5Xc2eSA9PNt_ncHr6a8zbe8_33wIh8jOVje-NX4").sheet1
-sold_sheet = client.open_by_key("1a6In5Xc2eSA9PNt_ncHr6a8zbe8_33wIh8jOVje-NX4").worksheets()[2]
-
-
-
-class States(StatesGroup):
-    START_STATE = State()
-    # HELP_WITH_PICTURE = State()
-    HELP_WITH_PIC_NAME = State()
-    # HELP_WITH_PIC_NUM = State()
-    HELP_ORD_NAME = State()
-    BUY_PICTURE = State()
-    CHOOSE_STYLE = State()
-    CHOOSE_SHADES = State()
-    LIST_OF_PICTURES = State()
-    CUR_PICTURE = State()
-    CUR_PICTURE_CONFIRMATION = State()
-    ASK_FOR_CONTACT = State()
-    MANAGER_MODE = State()
-    FAVOURITES = State()
-    PAY_WITH_CASH = State()
-    PAY_WITH_CRYPT = State()
-
-
-
-go_back_but = InlineKeyboardButton('Назад🔙', callback_data='go back')
-
-
-give_choice_markup =InlineKeyboardMarkup() \
-                    .insert(InlineKeyboardButton(_('Картой'), callback_data='card')) \
-                    .insert(InlineKeyboardButton(_('Криптой'), callback_data='crypt')) \
-                    .add(InlineKeyboardButton(_('Наличными (полная предоплата)'), callback_data='cash'))
-
-crypt_choice = InlineKeyboardMarkup()\
-    .insert(InlineKeyboardButton('BTC', callback_data='btc')) \
-    .insert(InlineKeyboardButton('ETH', callback_data='eth')) \
-    .add(InlineKeyboardButton('USDT', callback_data='usdt'))
-
-start_message = _('Привет! Я - Искусство, как и ты, Человек. Только бот. '
-                'Здесь ты можешь выбрать картину на свой вкус или мои кореша-дизайнеры'
-                ' помогут подобрать самую подходящую для твоего дома картину.')
-
-select_style = 'Выберите стиль картин'
-select_style_error = 'Такого стиля нет'
-
-select_shade = 'Предпочтения в оттенках?'
-select_shade_error = 'Такого оттенка не найдено'
-
-manager_pending = _('Наш менеджер подтверждает заказ. В скором времени появится '
-                  'кнопка для оплаты заказа.')
-
-successful_order = _('Спасибо за заказ! '
-                   'В скором времени с вами свяжется наш менеджер!')
-
-# help_pic_message = 'Ваши фото квартиры/жилого помещения (1-5 фото)'
-
-help_message = _('Я - Искусство, как и ты, Человек. Только бот.'
-               'Здесь ты можешь выбрать картину на свой вкус или мои кореша-дизайнеры '
-               'помогут подобрать самую подходящую для твоего дома картину. '
-               'Для навигации используйте кнопки.')
-
-unknown_command = _('Я вас не понимаю :(. Нажмите, пожалуйста, на кнопку.')
-
-Base = declarative_base()
-
-style_pic_table = Table('style_pic_table', Base.metadata,
-                        Column('style_id', Integer, ForeignKey('style.id', ondelete="CASCADE")),
-                        Column('picture_id', Integer, ForeignKey('picture.id', ondelete="CASCADE"))
-                        )
-
-shade_pic_table = Table('shade_pic_table', Base.metadata,
-                        Column('shade_id', Integer, ForeignKey('shade.id',ondelete='CASCADE')),
-                        Column('picture_id', Integer, ForeignKey('picture.id', ondelete="CASCADE"))
-                        )
-
-
-class Style(Base):
-    __tablename__ = 'style'
-    id = Column(Integer, primary_key=True)
-    name = Column(String(31))
-
-    pictures = relationship(
-        'Picture',
-        secondary=style_pic_table,
-        back_populates='styles')
-
-
-class Shade(Base):
-    __tablename__ = 'shade'
-    id = Column(Integer, primary_key=True)
-    name = Column(String(31))
-    pictures = relationship(
-        'Picture',
-        secondary=shade_pic_table,
-        back_populates='shades')
-
-
-class Picture(Base):
-    __tablename__ = 'picture'
-    id = Column(Integer, primary_key=True)
-    name = Column(String(63))
-    ph_url = Column(String(767))
-    size = Column(String(127))
-    author = Column(String(127))
-    price = Column(Integer)
-    year = Column(Integer)
-    mats = Column(String(63))
-    art_styles = Column(String(127))
-    shades = relationship(
-        'Shade',
-        secondary=shade_pic_table,
-        back_populates='pictures')
-    styles = relationship(
-        'Style',
-        secondary=style_pic_table,
-        back_populates='pictures')
-
-
-
-
-
-
-host='database-1.c8pemjym32rz.us-east-2.rds.amazonaws.com'
-db_name='postgres'
-user='postgres'
-password='Y3dWgd3AmJ08MEKTnpnX'
-
-columns = {'name': 'Название картины',
-           'styles': 'Стиль/Стили',
-           'shade': 'Оттенок/Оттенки',
-           'price': 'Цена',
-           'size': 'Размер',
-           'url': 'URL фотографии',
-           'author': 'Автор',
-           'mats': 'Материал/краски',
-           'year': 'Написана в',
-           'art_st': 'Стиль'
-
-           }
 
 
 # CATEGORY CHOOSE HANDLERd
@@ -274,13 +97,13 @@ async def send_invoice(user_id):
             prices_int = []
             i=0
             while price != 0:
-                minus = price%CUR_DIV
+                minus = price % MAX_SUM_ALLOWED_PER_OP
                 if minus != 0:
                     prices_int.append((i,minus))
                     price -= minus
                 else:
-                    prices_int.append((i,CUR_DIV))
-                    price -= CUR_DIV
+                    prices_int.append((i, MAX_SUM_ALLOWED_PER_OP))
+                    price -= MAX_SUM_ALLOWED_PER_OP
                 i+=1
             data['prices_int']=prices_int
         data["ord_cur_time"] = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
